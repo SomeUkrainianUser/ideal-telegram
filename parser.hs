@@ -7,8 +7,6 @@ data UnaryOperator = Not
                     | Dereference
                     deriving (Show, Eq)
 
-data UnaryOperation = UnaryOperation UnaryOperator Expression deriving (Show, Eq)
-
 data BinaryOperator =  Plus 
                        | Minus
                        | Star
@@ -35,12 +33,10 @@ data BinaryOperator =  Plus
                        deriving (Show, Eq)
                        
 
-data BinaryOperation = BinaryOperation BinaryOperator Expression Expression deriving (Show, Eq)
-
 data Expression = Number Int
                  | Var Variable
-                 | Unary UnaryOperation
-                 | Binary BinaryOperation
+                 | Unary UnaryOperator Expression
+                 | Binary BinaryOperator Expression Expression
                  deriving (Show, Eq)
 
 data Modifier = Unsigned
@@ -59,6 +55,17 @@ data Type = MakeType BaseType [Modifier] Int deriving (Show, Eq)
 
 data Variable = Variable Type String deriving (Show, Eq)
 
+type Arguments = [Variable]
+
+data Function = Function String Arguments Type (Maybe Block) deriving (Show, Eq)
+
 data VariableDeclaration = VariableInit Variable Expression
                           | VariableDeclare Variable
                           deriving (Show, Eq)
+
+type Block = [Statement]
+
+data Statement = VarDecl VariableDeclaration
+                | Block Block
+                | FuncDecl Function
+                deriving (Show, Eq)
