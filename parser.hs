@@ -1,7 +1,7 @@
 module Parser where
 
 import Tokenizer
-import Distribution.Compat.Prelude (ExitCode, exitWith)
+import Data.String
 
 data UnaryOperator = Not
                     | Pointer
@@ -151,6 +151,217 @@ parseType toks
             (stars, remainderPostPtr) = span (== TokenStar) remainderPostType
             ptr_depth = length stars
 
+parseExpression :: [Token] -> (Expression, [Token])
+parseExpression toks
+    | [TokenValue x] <- toks = (Number x, [])
+    | TokenValue x : TokenSemicolon : remainder <- toks = (Number x, remainder)
+    | TokenValue x : TokenRPar : remainder <- toks = (Number x, remainder)
+    | containsPlus = let (pLhsNode, _) = parseExpression pLhs
+                         (pRhsNode, _) = parseExpression pRhs
+                    in (Binary Plus pLhsNode pRhsNode, remainderPostExpr)
+    | containsMinus = let (mLhsNode, _) = parseExpression mLhs
+                          (mRhsNode, _) = parseExpression mRhs
+                    in (Binary Minus mLhsNode mRhsNode, remainderPostExpr)
+    | containsGreater = let (gLhsNode, _) = parseExpression gLhs
+                            (gRhsNode, _) = parseExpression gRhs
+                    in (Binary Greater gLhsNode gRhsNode, remainderPostExpr)
+    | containsLess = let (lLhsNode, _) = parseExpression lLhs
+                         (lRhsNode, _) = parseExpression lRhs
+                    in (Binary Less lLhsNode lRhsNode, remainderPostExpr)
+    | containsGreaterEqual = let (geLhsNode, _) = parseExpression geLhs
+                                 (geRhsNode, _) = parseExpression geRhs
+                    in (Binary GreaterEqual geLhsNode geRhsNode, remainderPostExpr)
+    | containsLessEqual = let (leLhsNode, _) = parseExpression leLhs
+                              (leRhsNode, _) = parseExpression leRhs
+                    in (Binary LessEqual leLhsNode leRhsNode, remainderPostExpr)
+    | containsEqual = let (eLhsNode, _) = parseExpression eLhs
+                          (eRhsNode, _) = parseExpression eRhs
+                    in (Binary Equal eLhsNode eRhsNode, remainderPostExpr)
+    | containsNotEqual = let (neLhsNode, _) = parseExpression neLhs
+                             (neRhsNode, _) = parseExpression neRhs
+                    in (Binary NotEqual neLhsNode neRhsNode, remainderPostExpr)
+    | containsAnd = let (aLhsNode, _) = parseExpression aLhs
+                        (aRhsNode, _) = parseExpression aRhs
+                    in (Binary And aLhsNode aRhsNode, remainderPostExpr)
+    | containsOr = let (oLhsNode, _) = parseExpression oLhs
+                       (oRhsNode, _) = parseExpression oRhs
+                    in (Binary Or oLhsNode oRhsNode, remainderPostExpr)
+    | containsXor = let (xLhsNode, _) = parseExpression xLhs
+                        (xRhsNode, _) = parseExpression xRhs
+                    in (Binary Xor xLhsNode xRhsNode, remainderPostExpr)
+    | containsNand = let (naLhsNode, _) = parseExpression naLhs
+                         (naRhsNode, _) = parseExpression naRhs
+                    in (Binary Nand naLhsNode naRhsNode, remainderPostExpr)
+    | containsNor = let (noLhsNode, _) = parseExpression noLhs
+                        (noRhsNode, _) = parseExpression noRhs
+                    in (Binary Nor noLhsNode noRhsNode, remainderPostExpr)
+    | containsXnor = let (xnLhsNode, _) = parseExpression xnLhs
+                         (xnRhsNode, _) = parseExpression xnRhs
+                    in (Binary Xnor xnLhsNode xnRhsNode, remainderPostExpr)
+    | containsBAnd = let (baLhsNode, _) = parseExpression baLhs
+                         (baRhsNode, _) = parseExpression baRhs
+                    in (Binary BitwiseAnd baLhsNode baRhsNode, remainderPostExpr)
+    | containsBOr = let (boLhsNode, _) = parseExpression boLhs
+                        (boRhsNode, _) = parseExpression boRhs
+                    in (Binary BitwiseOr boLhsNode boRhsNode, remainderPostExpr)
+    | containsBXor = let (bxLhsNode, _) = parseExpression bxLhs
+                         (bxRhsNode, _) = parseExpression bxRhs
+                    in (Binary BitwiseXor bxLhsNode bxRhsNode, remainderPostExpr)
+    | containsBNand = let (bnaLhsNode, _) = parseExpression bnaLhs
+                          (bnaRhsNode, _) = parseExpression bnaRhs
+                    in (Binary BitwiseNand bnaLhsNode bnaRhsNode, remainderPostExpr)
+    | containsBNor = let (bnoLhsNode, _) = parseExpression bnoLhs
+                         (bnoRhsNode, _) = parseExpression bnoRhs
+                    in (Binary BitwiseNor bnoLhsNode bnoRhsNode, remainderPostExpr)
+    | containsBXnor = let (bxnLhsNode, _) = parseExpression bxnLhs
+                          (bxnRhsNode, _) = parseExpression bxnRhs
+                    in (Binary BitwiseXnor bxnLhsNode bxnRhsNode, remainderPostExpr)
+    | containsMul = let (mulLhsNode, _) = parseExpression mulLhs
+                        (mulRhsNode, _) = parseExpression mulRhs
+                    in (Binary Star mulLhsNode mulRhsNode, remainderPostExpr)
+    | containsDiv = let (dLhsNode, _) = parseExpression dLhs
+                        (dRhsNode, _) = parseExpression dRhs
+                    in (Binary Slash dLhsNode dRhsNode, remainderPostExpr)
+        where
+            reverseTuple :: (a, a) -> (a, a)
+            reverseTuple (x, y) = (y, x)
+
+            (exprTok, remainderPostExpr) = span (/= TokenSemicolon) toks
+
+            (prRhs, sprLhs) = span (/= TokenPlus) (reverse toks)
+            (_:prLhs) = sprLhs
+            containsPlus = not (null sprLhs)
+            pRhs = reverse prRhs
+            pLhs = reverse prLhs
+
+            (mrRhs, smrLhs) = span (/= TokenMinus) (reverse toks)
+            (_:mrLhs) = smrLhs
+            containsMinus = not (null smrLhs)
+            mRhs = reverse mrRhs
+            mLhs = reverse mrLhs
+
+            (grRhs, sgrLhs) = span (/= TokenGreaterThan) (reverse toks)
+            (_:grLhs) = sgrLhs
+            containsGreater = not (null sgrLhs)
+            gRhs = reverse grRhs
+            gLhs = reverse grLhs
+
+            (lrRhs, slrLhs) = span (/= TokenLessThan) (reverse toks)
+            (_:lrLhs) = slrLhs
+            containsLess = not (null slrLhs)
+            lRhs = reverse lrRhs
+            lLhs = reverse lrLhs
+
+            (gerRhs, sgerLhs) = span (/= TokenGreaterOrEqualTo) (reverse toks)
+            (_:gerLhs) = sgerLhs
+            containsGreaterEqual = not (null sgerLhs)
+            geRhs = reverse gerRhs
+            geLhs = reverse gerLhs
+
+            (lerRhs, slerLhs) = span (/= TokenLessOrEqualTo) (reverse toks)
+            (_:lerLhs) = slerLhs
+            containsLessEqual = not (null slerLhs)
+            leRhs = reverse lerRhs
+            leLhs = reverse lerLhs
+
+            (erRhs, serLhs) = span (/= TokenEqual) (reverse toks)
+            (_:erLhs) = serLhs
+            containsEqual = not (null serLhs)
+            eRhs = reverse erRhs
+            eLhs = reverse erLhs
+
+            (nerRhs, snerLhs) = span (/= TokenNotEqual) (reverse toks)
+            (_:nerLhs) = snerLhs
+            containsNotEqual = not (null snerLhs)
+            neRhs = reverse nerRhs
+            neLhs = reverse nerLhs
+
+            (arRhs, sarLhs) = span (/= TokenAnd) (reverse toks)
+            (_:arLhs) = sarLhs
+            containsAnd = not (null sarLhs)
+            aRhs = reverse arRhs
+            aLhs = reverse arLhs
+
+            (orRhs, sorLhs) = span (/= TokenOr) (reverse toks)
+            (_:orLhs) = sorLhs
+            containsOr = not (null sorLhs)
+            oRhs = reverse orRhs
+            oLhs = reverse orLhs
+
+            (xrRhs, sxrLhs) = span (/= TokenXor) (reverse toks)
+            (_:xrLhs) = sxrLhs
+            containsXor = not (null sxrLhs)
+            xRhs = reverse xrRhs
+            xLhs = reverse xrLhs
+
+            (narRhs, snarLhs) = span (/= TokenNand) (reverse toks)
+            (_:narLhs) = snarLhs
+            containsNand = not (null snarLhs)
+            naRhs = reverse narRhs
+            naLhs = reverse narLhs
+
+            (norRhs, snorLhs) = span (/= TokenNor) (reverse toks)
+            (_:norLhs) = snorLhs
+            containsNor = not (null snorLhs)
+            noRhs = reverse norRhs
+            noLhs = reverse norLhs
+
+            (xnrRhs, sxnrLhs) = span (/= TokenXnor) (reverse toks)
+            (_:xnrLhs) = sxnrLhs
+            containsXnor = not (null sxnrLhs)
+            xnRhs = reverse xnrRhs
+            xnLhs = reverse xnrLhs
+
+
+            (barRhs, sbarLhs) = span (/= TokenAmpersand) (reverse toks)
+            (_:barLhs) = sbarLhs
+            containsBAnd = not (null sbarLhs)
+            baRhs = reverse barRhs
+            baLhs = reverse barLhs
+
+            (borRhs, sborLhs) = span (/= TokenPipe) (reverse toks)
+            (_:borLhs) = sborLhs
+            containsBOr = not (null sborLhs)
+            boRhs = reverse borRhs
+            boLhs = reverse borLhs
+
+            (bxrRhs, sbxrLhs) = span (/= TokenCaret) (reverse toks)
+            (_:bxrLhs) = sbxrLhs
+            containsBXor = not (null sbxrLhs)
+            bxRhs = reverse bxrRhs
+            bxLhs = reverse bxrLhs
+
+            (bnarRhs, sbnarLhs) = span (/= TokenBitwiseNand) (reverse toks)
+            (_:bnarLhs) = sbnarLhs
+            containsBNand = not (null sbnarLhs)
+            bnaRhs = reverse bnarRhs
+            bnaLhs = reverse bnarLhs
+
+            (bnorRhs, sbnorLhs) = span (/= TokenBitwiseNor) (reverse toks)
+            (_:bnorLhs) = sbnorLhs
+            containsBNor = not (null sbnorLhs)
+            bnoRhs = reverse bnorRhs
+            bnoLhs = reverse bnorLhs
+
+            (bxnrRhs, sbxnrLhs) = span (/= TokenBitwiseXnor) (reverse toks)
+            (_:bxnrLhs) = sbxnrLhs
+            containsBXnor = not (null sxnrLhs)
+            bxnRhs = reverse bxnrRhs
+            bxnLhs = reverse bxnrLhs
+            
+            (mulrRhs, smulrLhs) = span (/= TokenStar) (reverse toks)
+            containsMul = not (null smulrLhs)
+            (_:mulrLhs) = smulrLhs
+            mulRhs = reverse mulrRhs
+            mulLhs = reverse mulrLhs
+
+            (drRhs, sdrLhs) = span (/= TokenSlash) (reverse toks)
+            (_:drLhs) = sdrLhs
+            containsDiv = not (null sdrLhs)
+            dRhs = reverse drRhs
+            dLhs = reverse drLhs
+
+
 parseVariableDeclaration :: [Token] -> (VariableDeclaration, [Token])
 parseVariableDeclaration toks
     | null remainderPostType = error "Expected an ID, but received EOF"
@@ -181,8 +392,8 @@ parseVariableDeclaration toks
 
 
 
-parseStatement :: [Token] -> Either ExitCode (Statement, [Token])
-parseStatement (TokenID x : TokenID y : lst) = Right (Block [], [])
+parseStatement :: [Token] -> (Statement, [Token])
+parseStatement (TokenID x : TokenID y : lst) = (Block [], [])
 
 parse :: [Token] -> Block
 parse [] = []
