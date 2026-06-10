@@ -71,6 +71,9 @@ data Statement = VarDecl VariableDeclaration
                 | FuncDecl Function
                 deriving (Show, Eq)
 
+keywords = ["integer", "floating", "character", "boolean", "void", "unsigned", "signed", "immutable", "mutable",
+            "byte", "half", "word", "double", "args"]
+
 isBaseType :: Token -> Bool
 isBaseType (TokenID "integer") = True
 isBaseType (TokenID "floating") = True
@@ -147,6 +150,36 @@ parseType toks
             remainderPostType = drop 1 remainder
             (stars, remainderPostPtr) = span (== TokenStar) remainderPostType
             ptr_depth = length stars
+
+parseVariableDeclaration :: [Token] -> (VariableDeclaration, [Token])
+parseVariableDeclaration toks
+    | null remainderPostType = error "Expected an ID, but received EOF"
+    | null remainderPostName = error "Expected a semicolon or an initialization, but received EOF"
+    | not (isIDToken name)  = error ("Expected an ID, but received " ++ show name)
+    | isKeyword x = error ("Expected an ID, but received keyword '" ++ x ++ "'")
+    | end `notElem` [TokenSemicolon, TokenAssign] = error ("Expected a semicolon or an initialization, but received " ++ show end)
+    | end == TokenSemicolon = (VariableDeclare (Variable varType x), remainderPostEnd)
+    | null remainderPostEnd = error "Expected an expression, but received EOF"
+    | null remainderPostExpr = error "Expected a semicolon, but received EOF"
+    | postExprEnd /= TokenSemicolon = error ("Expected a semicolon, but received " ++ show postExprEnd)
+    | otherwise = (VariableInit (Variable varType x) expr, remainder)
+        where
+            (varType, remainderPostType) = parseType toks
+            (name:remainderPostName) = remainderPostType
+            (end:remainderPostEnd) = remainderPostName
+            (expr, remainderPostExpr) = parseExpression remainderPostEnd
+            (postExprEnd:remainder) = remainderPostExpr
+
+            TokenID x = name
+
+            isIDToken :: Token -> Bool
+            isIDToken (TokenID _) = True
+            isIDToken _ = False
+
+            isKeyword :: String -> Bool
+            isKeyword x = x `elem` keywords
+
+
 
 parseStatement :: [Token] -> Either ExitCode (Statement, [Token])
 parseStatement (TokenID x : TokenID y : lst) = Right (Block [], [])
