@@ -39,7 +39,8 @@ data Token = TokenValue Int
             | TokenColon
             | TokenComma
             | TokenArrow
-            | BadToken
+            | TokenParens [Token]
+            | TokenBlock [Token]
             deriving(Eq, Show)
 
 isValidIDChar :: Char -> Bool

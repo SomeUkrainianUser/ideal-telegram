@@ -151,11 +151,29 @@ parseType toks
             (stars, remainderPostPtr) = span (== TokenStar) remainderPostType
             ptr_depth = length stars
 
+parseParens :: [Token] -> Int -> Int -> [Token]
+parseParens [] _ _ = []
+parseParens toks (-1) x = TokenParens (drop 1 (init (take x toks))) : drop x toks
+parseParens toks depth len
+    | openCount > closeCount = error "Error: unmatched opening parenthesis"
+    | openCount < closeCount = error "Error: unmatched closing parenthesis"
+    | depth == 0 && len /= 0 = parseParens toks (-1) len 
+    | not (null nextPar) && take 1 nextPar == [TokenLPar] = parseParens toks (depth + 1) (len + length prePar + 1)
+    | not (null nextPar) && take 1 nextPar == [TokenRPar] = parseParens toks (depth - 1) (len + length prePar + 1)
+        where
+            openCount = length (filter (== TokenLPar) toks)
+            closeCount = length (filter (== TokenRPar) toks)
+            (prePar, nextPar) = span (`notElem` [TokenLPar, TokenRPar]) (drop len toks)
+    
+
 parseExpression :: [Token] -> (Expression, [Token])
+parseExpression [TokenParens x] = parseExpression x
+parseExpression [TokenValue x] = (Number x, [])
+parseExpression (TokenValue x : TokenSemicolon : remainder) = (Number x, remainder)
+parseExpression (TokenValue x : TokenRPar : remainder) = (Number x, remainder)
 parseExpression toks
-    | [TokenValue x] <- toks = (Number x, [])
-    | TokenValue x : TokenSemicolon : remainder <- toks = (Number x, remainder)
-    | TokenValue x : TokenRPar : remainder <- toks = (Number x, remainder)
+    | not (null par) = parseExpression (prePar ++ parseParens par 0 0)
+    | not (null rPar) = error "Error: unmatched closing parenthesis"
     | containsPlus = let (pLhsNode, _) = parseExpression pLhs
                          (pRhsNode, _) = parseExpression pRhs
                     in (Binary Plus pLhsNode pRhsNode, remainderPostExpr)
@@ -222,11 +240,15 @@ parseExpression toks
     | containsDiv = let (dLhsNode, _) = parseExpression dLhs
                         (dRhsNode, _) = parseExpression dRhs
                     in (Binary Slash dLhsNode dRhsNode, remainderPostExpr)
+    | otherwise = error "Expression parsing error"
         where
             reverseTuple :: (a, a) -> (a, a)
             reverseTuple (x, y) = (y, x)
 
             (exprTok, remainderPostExpr) = span (/= TokenSemicolon) toks
+
+            (prePar, par) = span (/= TokenLPar) exprTok
+            (_, rPar) = span (/= TokenRPar) exprTok
 
             (prRhs, sprLhs) = span (/= TokenPlus) (reverse toks)
             (_:prLhs) = sprLhs
@@ -395,5 +417,12 @@ parseVariableDeclaration toks
 parseStatement :: [Token] -> (Statement, [Token])
 parseStatement (TokenID x : TokenID y : lst) = (Block [], [])
 
+parseBlock :: [Token] -> Block
+parseBlock [] = []
+parseBlock (TokenRCurly:_) = []
+parseBlock l = st : parse remainder
+    where
+        (st, remainder) = parseStatement l
+
 parse :: [Token] -> Block
-parse [] = []
+parse = parseBlock
