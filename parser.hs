@@ -3,9 +3,11 @@ module Parser where
 import Tokenizer
 import Data.String
 
-data UnaryOperator = Not
-                    | Pointer
+data UnaryOperator = Negate
+                    | Not
+                    | BNot
                     | Dereference
+                    | Address
                     deriving (Show, Eq)
 
 data BinaryOperator =  Plus 
@@ -170,15 +172,16 @@ parseExpression :: [Token] -> (Expression, [Token])
 parseExpression [TokenParens x] = parseExpression x
 parseExpression [TokenValue x] = (Number x, [])
 parseExpression (TokenValue x : TokenSemicolon : remainder) = (Number x, remainder)
-parseExpression (TokenValue x : TokenRPar : remainder) = (Number x, remainder)
+parseExpression [TokenID x] = (Var (Variable (Type Void [] 0) x), [])
+parseExpression (TokenID x : TokenSemicolon : remainder) = (Var (Variable (Type Void [] 0) x), remainder)
 parseExpression toks
     | not (null par) = parseExpression (prePar ++ parseParens par 0 0)
     | not (null rPar) = error "Error: unmatched closing parenthesis"
     | containsPlus = let (pLhsNode, _) = parseExpression pLhs
                          (pRhsNode, _) = parseExpression pRhs
                     in (Binary Plus pLhsNode pRhsNode, remainderPostExpr)
-    | containsMinus = let (mLhsNode, _) = parseExpression mLhs
-                          (mRhsNode, _) = parseExpression mRhs
+    | containsMinus && not isMU = let (mLhsNode, _) = parseExpression mLhs
+                                      (mRhsNode, _) = parseExpression mRhs
                     in (Binary Minus mLhsNode mRhsNode, remainderPostExpr)
     | containsGreater = let (gLhsNode, _) = parseExpression gLhs
                             (gRhsNode, _) = parseExpression gRhs
@@ -240,6 +243,20 @@ parseExpression toks
     | containsDiv = let (dLhsNode, _) = parseExpression dLhs
                         (dRhsNode, _) = parseExpression dRhs
                     in (Binary Slash dLhsNode dRhsNode, remainderPostExpr)
+    | containsMinus && isMU = let (mNode, _) = parseExpression mRhs
+                    in (Unary Negate mNode, remainderPostExpr)
+    | isUlnLGarbage = error "Garbage behind a unary operator"
+    | containsLNot = let (lnNode, _) = parseExpression lnRhs
+                    in (Unary Not lnNode, remainderPostExpr)
+    | isUbnLGarbage = error "Garbage behind a unary operator"
+    | containsBNot = let (bnNode, _) = parseExpression bnRhs
+                    in (Unary BNot bnNode, remainderPostExpr)
+    | isUdrfLGarbage = error "Garbage behind a unary operator"
+    | containsDR = let (drfNode, _) = parseExpression drfRhs
+                    in (Unary Dereference drfNode, remainderPostExpr)
+    | isUadLGarbage = error "Garbage behind a unary operator"
+    | containsAddr = let (adNode, _) = parseExpression adRhs
+                    in (Unary Address adNode, remainderPostExpr)
     | otherwise = error "Expression parsing error"
         where
             reverseTuple :: (a, a) -> (a, a)
@@ -259,6 +276,7 @@ parseExpression toks
             (mrRhs, smrLhs) = span (/= TokenMinus) (reverse toks)
             (_:mrLhs) = smrLhs
             containsMinus = not (null smrLhs)
+            isMU = smrLhs == [TokenMinus]
             mRhs = reverse mrRhs
             mLhs = reverse mrLhs
 
@@ -382,6 +400,26 @@ parseExpression toks
             containsDiv = not (null sdrLhs)
             dRhs = reverse drRhs
             dLhs = reverse drLhs
+
+            (lnrRhs, slnrLhs) = span (/= TokenNot) (reverse toks)
+            isUlnLGarbage = not (null (drop 1 slnrLhs))
+            containsLNot = not (null slnrLhs)
+            lnRhs = reverse lnrRhs
+
+            (bnrRhs, sbnrLhs) = span (/= TokenTilde) (reverse toks)
+            isUbnLGarbage = not (null (drop 1 sbnrLhs))
+            containsBNot = not (null sbnrLhs)
+            bnRhs = reverse bnrRhs
+
+            (drfrRhs, sdrfrLhs) = span (/= TokenAt) (reverse toks)
+            isUdrfLGarbage = not (null (drop 1 sdrfrLhs))
+            containsDR = not (null sdrfrLhs)
+            drfRhs = reverse drfrRhs
+
+            (adrRhs, sadrLhs) = span (/= TokenDollarSign) (reverse toks)
+            isUadLGarbage = not (null (drop 1 sadrLhs))
+            containsAddr = not (null sadrLhs)
+            adRhs = reverse adrRhs
 
 
 parseVariableDeclaration :: [Token] -> (VariableDeclaration, [Token])

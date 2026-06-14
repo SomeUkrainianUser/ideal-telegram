@@ -70,6 +70,7 @@ tokenize src
     | prefix2 == "~^" = TokenBitwiseXnor        : tokenize pp2src
     | prefix2 == "->" = TokenArrow              : tokenize pp2src
 
+    | prefix1 == "!"  = TokenNot                : tokenize pp1src
     | prefix1 == ">"  = TokenGreaterThan        : tokenize pp1src 
     | prefix1 == "<"  = TokenLessThan           : tokenize pp1src
     | prefix1 == "&"  = TokenAmpersand          : tokenize pp1src
